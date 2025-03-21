@@ -16,11 +16,14 @@ def main():
         print(f'\033[94m Getting playlist {playlist["nickname"]} on Apple Music... \033[90m')
         songs: list(AppleSong) =  get_songs_from_apple_playlist(playlist["applemusic_playlist_url"])
 
-
         # Add new songs to playlist
         print(f'\033[94m Updating playlist... \033[90m ')
         add_songs_to_spotify_playlist(spAuth, playlist['spotify_playlist_id'], songs)
-        
+
+        id = playlist['spotify_playlist_id']
+
+        print(f'\033[93m https://open.spotify.com/playlist/{id}')
+        print(f'\n\n')
 
 class AppleSong:
     def __init__(self, title: str, artists: list, length: int):
@@ -52,7 +55,7 @@ def add_songs_to_spotify_playlist(auth: SpotifyAuth, playlist_id, songs: AppleSo
                         data=json.dumps({'uris': song_uris}))
             
             # Check if the request was successful and Print the output
-            if(r.status_code == 201):
+            if(r.status_code == 200):
                 updated_songs += len(song_uris)
             else:
                 print(f'\033[31m Could not add songs to playlist: {r.content}')
@@ -69,7 +72,7 @@ def add_songs_to_spotify_playlist(auth: SpotifyAuth, playlist_id, songs: AppleSo
                     data=json.dumps({'uris': song_uris}))
         
         # Check if the request was successful and Print the output
-        if(r.status_code == 201):
+        if(r.status_code == 200):
             updated_songs += len(song_uris)
         else:
             print(f'\033[31m Could not add songs to playlist: {r.content}')
@@ -78,8 +81,21 @@ def add_songs_to_spotify_playlist(auth: SpotifyAuth, playlist_id, songs: AppleSo
     print(f'\033[32m {updated_songs} songs Updated!')
     if(len(songs) - updated_songs > 0):
         print(f'\033[32m Could not find uris for {len(songs) - updated_songs} songs')
-    print(f'\n\n')
 
+def iso_duration_to_ms(iso_duration):
+    # Regex to match the ISO 8601 duration format (e.g., PT4M39S)
+    match = re.match(r"PT(?:(\d+)M)?(?:(\d+)S)?", iso_duration)
+    
+    if not match:
+        raise ValueError("Invalid ISO 8601 duration format")
+    
+    # Extract minutes and seconds
+    minutes = int(match.group(1)) if match.group(1) else 0
+    seconds = int(match.group(2)) if match.group(2) else 0
+    
+    # Convert minutes and seconds to milliseconds
+    total_ms = (minutes * 60 + seconds) * 1000
+    return total_ms
 
 def get_songs_from_apple_playlist(playlist_url):
     r = requests.get(playlist_url)
@@ -108,17 +124,18 @@ def get_songs_from_apple_playlist(playlist_url):
                 soup = BeautifulSoup(r.content, 'html.parser')
 
                 # Find the server data script tag by its type and id
-                script_tag = soup.find('script', {'type': 'application/json', 'id': 'serialized-server-data'})
+                script_tag = soup.find('script', {'type': 'application/ld+json', 'id': 'schema:song'})
 
                 # Extract the JSON content from the script tag
                 json_data = script_tag.string
                 data = json.loads(json_data)
 
-                song_title = data[0]['data']['sections'][0]['items'][0]['title']
-                song_length_ms = data[0]['data']['seoData']['ogSongs'][0]['attributes']['durationInMillis']
-                artists_string = data[0]['data']['sections'][0]['items'][0]['artists']
-                artists = artists_string.split(', ')
-
+                song_title = data["name"]
+                iso_key = data["audio"]["duration"]
+                song_length_ms = iso_duration_to_ms(iso_key)
+                artists = []
+                for a in data["audio"]["byArtist"]:
+                    artists.append(a["name"])
 
                 print(f"Fetched AppleMusic data for {song_title} by {artists}")
 
