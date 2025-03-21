@@ -48,10 +48,12 @@ refresh_token = 'xxx'
 #                                           ^ This is the playlist id
 playlists = [
     {
+        'nickname': 'xxx'
         'applemusic_playlist_url': 'https://music.apple.com/us/playlist/xxx/pl.xxx',
         'spotify_playlist_id': 'xxx',
     },
     {
+        'nickname': 'xxx',
         'applemusic_playlist_url': 'https://music.apple.com/us/playlist/xxx/pl.xxx',
         'spotify_playlist_id': 'xxx',
     },
